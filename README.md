@@ -3,7 +3,9 @@
 My fractal program ported to C
 
 # Dependacies
-This currently depends on TinyPngOut a C library for writing png files
+##tinypngout
+https://www.nayuki.io/page/tiny-png-output
+Used to write the png out
 
 # To Compile
 At the moment this program is designed to be recompiled on settings changes
