@@ -25,6 +25,21 @@
 #define depth 1
 #endif
 
+typedef struct compNum {
+	long double r;
+	long double i;
+} compNum;
+
+compNum calcC(int x, int y);
+float calcPoint(compNum point);
+int makePicture();
+void setPalette();
+uint8_t* getColor(float iterations);
+void hslTorgb(uint8_t *color, float h, float s, float l);
+
+static int printError(enum TinyPngOut_Status status);
+
+
 const float logOf2 = log2l(2); //constant so we only compute this once
 
 /* we declare this here because in theory allocating this at compile time
@@ -36,23 +51,10 @@ const float logOf2 = log2l(2); //constant so we only compute this once
  */
 float pixels[setwidth][setheight];
 
-typedef struct compNum {
-	long double r;
-	long double i;
-} compNum;
-
-compNum calcC(int x, int y);
-float calcPoint(compNum point);
-int makePicture();
-uint8_t* getColor(float iterations);
-void hslTorgb(uint8_t *color, float h, float s, float l);
-
-static int printError(enum TinyPngOut_Status status);
+float palette[max];
 
 
 int main(){
-	printf("%lu\n", sizeof(pixels));
-
 	long numPixels = (long)setheight * (long)setwidth;
 	long numDone = 0;
 	float percent = 0;
@@ -60,19 +62,20 @@ int main(){
 	for(int x = 0; x < setwidth; ++x){
 		for(int y = 0; y < setheight; ++y){
 			pixels[x][y] = calcPoint(calcC(x, y));
-			++numDone;
+/*			++numDone;
 			float newPercent = ((float) numDone / (float) numPixels) * 100;
 			newPercent = trunc(newPercent);
 			if(percent < newPercent){
 				percent = newPercent;
 				printf("%.0f%% done. %ld/%ld pixels.\n", percent, numDone, numPixels);
 			}
-		}
+*/		}
 
 	}
-
-	printf("\nDone calculating. Creating the image now.\n");
+	setPalette();
+	//printf("\nDone calculating. Creating the image now.\n");
 	return makePicture();
+	return 0;
 }
 
 /* This takes a point in the image
@@ -86,11 +89,11 @@ compNum calcC(int x, int y){
 /* This takes a complex point and calculates the fractal at it
  */
 float calcPoint(compNum point){
-	long double x = 0, y = 0, xSqr = 0, ySqr = 0;
+	long double x = 0, y = 0, xSqr = 0, ySqr = 0, xTemp;
 	int iteration = 0; 
 
 	while( xSqr + ySqr < 1000 && iteration < max){
-		long double xTemp = xSqr - ySqr + point.r;
+		xTemp = xSqr - ySqr + point.r;
 		y = 2 * x * y + point.i;
 		x = xTemp;
 		xSqr = x * x;
@@ -102,7 +105,7 @@ float calcPoint(compNum point){
 		return iteration; //if it's in the set no need for normalization
 	} else{
 		float nu = log2(log2(sqrt(xSqr + ySqr))) / logOf2; //normalization
-		return iteration + 1 - nu;
+		return iteration - nu;
 	}
 }
 /* This takes list of pixels and writes it to a file
@@ -136,11 +139,27 @@ int makePicture(){
 	return EXIT_SUCCESS;
 }
 
-/* This is iterative coloring
- * it takes a number of iterations and returns
- * the color for that value
- * it isn't great since the color becomes increasingly similar at higher iterations
+/* histogram coloring
  */
+void setPalette(){
+	int total = 0;
+	double h = 0;
+	unsigned int* histogram = malloc(max * sizeof(int));
+	for(int x = 0; x < setwidth; ++x){
+		for(int y = 0; y < setheight; ++y){
+			if (pixels[x][y] != max){
+				histogram[(int) floor(pixels[x][y])]++;
+			}
+		}
+	}
+	for(int i = 0; i < max; ++i)
+		total += histogram[i];
+	for(int i = 0; i < max; ++i){
+		h += (float) histogram[i] / total;
+		palette[i] = h;
+	}
+	free(histogram);
+}
 uint8_t* getColor(float iterations){
 	static uint8_t color[3];
 	if (iterations == max){
@@ -148,8 +167,8 @@ uint8_t* getColor(float iterations){
 		color[1] = 0x00;
 		color[2] = 0x00;
 	} else{
-		float hLow = fmod((360.0f / (max - 1)) * floor(iterations) + 271, 360);
-		float hHigh = fmod((360.0f / (max - 1)) * ceil(iterations) + 271, 360);
+		float hLow = 80.0f * palette[(int)floor(iterations)] + 200; //this is the range for the colors, [200, 280]
+		float hHigh = 80.0f * palette[(int)ceil(iterations)] + 200;
 		float percent = fmod(iterations, 1);
 		
 		float h = (hHigh - hLow) * percent + hLow;
@@ -163,34 +182,33 @@ uint8_t* getColor(float iterations){
 }
 
 /* a pretty terrible hslTorgb function
- * this could probably be updated to use switch/case
  */
 void hslTorgb(uint8_t *color, float h, float s, float l){
 	float c = (1 - fabs(2 * l - 1)) * s;
 	float x = c * (1 - fabs(fmod((h / 60.0f), 2.0f) - 1));
 	float m = l - (c / 2.0f);
 
-	if (h >= 0 && h < 60){
+	if (h < 60){
 		color[0] = (uint8_t) ((c + m) * 255);
 		color[1] = (uint8_t) ((x + m) * 255);
 		color[2] = (uint8_t) (m * 255);
-	} else if (h >= 60 && h < 120){
+	} else if (h < 120){
 		color[0] = (uint8_t) ((x + m) * 255);
 		color[1] = (uint8_t) ((c + m) * 255);
 		color[2] = (uint8_t) (m * 255);
-	} else if (h >= 120 && h < 180){
+	} else if (h < 180){
 		color[0] = (uint8_t) (m * 255);
 		color[1] = (uint8_t) ((c + m) * 255);
 		color[2] = (uint8_t) ((x + m) * 255);
-	} else if (h >= 180 && h < 240){
+	} else if (h < 240){
 		color[0] = (uint8_t) (m * 255);
 		color[1] = (uint8_t) ((x + m) * 255);
 		color[2] = (uint8_t) ((c + m) * 255);
-	} else if (h >= 240 && h < 300){
+	} else if (h < 300){
 		color[0] = (uint8_t) ((x + m) * 255);
 		color[1] = (uint8_t) (m * 255);
 		color[2] = (uint8_t) ((c + m) * 255);
-	} else if (h >= 300 && h < 360){
+	} else if (h < 360){
 		color[0] = (uint8_t) ((c + m) * 255);
 		color[1] = (uint8_t) (m * 255);
 		color[2] = (uint8_t) ((x + m) * 255);
