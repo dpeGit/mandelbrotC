@@ -89,10 +89,16 @@ compNum calcC(int x, int y){
 /* This takes a complex point and calculates the fractal at it
  */
 float calcPoint(compNum point){
-	long double x = 0, y = 0, xSqr = 0, ySqr = 0, xTemp;
+	long double x = 0, y = 0, xSqr = 0, ySqr = 0, xTemp, derCTemp;
+	compNum derC;
+	derC.r = 1;
+	derC.i = 0;
 	int iteration = 0; 
 
 	while( xSqr + ySqr < 1000 && iteration < max){
+		derCTemp = 2 * (derC.r*x - derC.i*y) + 1;
+		derC.i = 2 * (derC.r*y + derC.i*x);
+		derC.r = derCTemp;
 		xTemp = xSqr - ySqr + point.r;
 		y = 2 * x * y + point.i;
 		x = xTemp;
@@ -104,8 +110,12 @@ float calcPoint(compNum point){
 	if(iteration == max){
 		return iteration; //if it's in the set no need for normalization
 	} else{
-		float nu = log2(log2(sqrt(xSqr + ySqr))) / logOf2; //normalization
-		return iteration - nu;
+		if ((xSqr + ySqr) * pow(log2(xSqr + ySqr), 2) < ((derC.r * derC.r) + (derC.i * derC.i)) * 4e-7){
+			return -1.0f;
+		} else {
+			float nu = log2(log2(sqrt(xSqr + ySqr))) / logOf2; //normalization
+			return iteration - nu;
+		}
 	}
 }
 /* This takes list of pixels and writes it to a file
@@ -149,6 +159,7 @@ void setPalette(){
 		for(int y = 0; y < setheight; ++y){
 			if (pixels[x][y] != max){
 				histogram[(int) floor(pixels[x][y])]++;
+				histogram[(int) ceil(pixels[x][y])]++;
 			}
 		}
 	}
@@ -158,7 +169,7 @@ void setPalette(){
 		h += (float) histogram[i] / total;
 		palette[i] = h;
 	}
-	free(histogram);
+	//free(histogram);
 }
 uint8_t* getColor(float iterations){
 	static uint8_t color[3];
@@ -166,6 +177,10 @@ uint8_t* getColor(float iterations){
 		color[0] = 0x00;
 		color[1] = 0x00;
 		color[2] = 0x00;
+	} else if (iterations == -1){
+		color[0] = 0xFF;
+		color[1] = 0xFF;
+		color[2] = 0xFF;
 	} else{
 		float hLow = 80.0f * palette[(int)floor(iterations)] + 200; //this is the range for the colors, [200, 280]
 		float hHigh = 80.0f * palette[(int)ceil(iterations)] + 200;
