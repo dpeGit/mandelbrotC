@@ -254,7 +254,7 @@ void setPalette(){
 		h += (float) histogram[i] / total;
 		palette[i] = h;
 	}
-	free(histogram);
+	//free(histogram);
 }
 
 void getColor(PIXEL_TYPE iterations, uint8_t *color){ 
@@ -271,8 +271,6 @@ void getColor(PIXEL_TYPE iterations, uint8_t *color){
 	/* normalized color */
 	} else {
 		float hLow = 80.0f * palette[(int)floor(iterations)] + 200; // this is the range for the colors, [200, 280]
-		float hHigh = 80.0f * palette[(int)ceil(iterations)] + 200;
-		float percent = fmod(iterations, 1);
 		
 		float h = (hHigh - hLow) * percent + hLow;
 		float s = 1.0f;
